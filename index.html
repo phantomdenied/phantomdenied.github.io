@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>phantomdenied — MTG Tools</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:         #08080f;
+    --surface:    #0e0e1c;
+    --panel:      #131325;
+    --border:     #1e1e3a;
+    --border-lit: #2e2e5a;
+    --gold:       #c9a84c;
+    --gold-light: #e8c96e;
+    --gold-dim:   #7a6030;
+    --purple:     #6b4fa0;
+    --text:       #ddd8cc;
+    --text-dim:   #7a7590;
+    --text-faint: #3a3555;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse 70% 50% at 15% 0%,   rgba(107,79,160,0.15) 0%, transparent 65%),
+      radial-gradient(ellipse 50% 40% at 85% 100%,  rgba(201,168,76,0.08) 0%, transparent 65%),
+      radial-gradient(ellipse 40% 30% at 50% 50%,   rgba(107,79,160,0.04) 0%, transparent 70%);
+  }
+
+  /* ── Hero ── */
+  .hero {
+    text-align: center;
+    padding: 80px 24px 60px;
+    position: relative;
+  }
+
+  .hero::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 200px; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  }
+
+  .hero-icon {
+    width: 72px; height: 72px;
+    background: linear-gradient(135deg, var(--gold-dim), var(--gold));
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    margin: 0 auto 24px;
+    box-shadow: 0 0 40px rgba(201,168,76,0.25), 0 8px 24px rgba(0,0,0,0.5);
+  }
+
+  .hero h1 {
+    font-family: 'Cinzel', serif;
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 700;
+    letter-spacing: 3px;
+    background: linear-gradient(90deg, var(--gold-light), var(--gold), #a07830);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+  }
+
+  .hero .subtitle {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-weight: 400;
+  }
+
+  /* ── Grid ── */
+  .tools-section {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 56px 24px 80px;
+  }
+
+  .section-label {
+    font-family: 'Cinzel', serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    text-align: center;
+    margin-bottom: 28px;
+  }
+
+  .tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+
+  /* ── Tool card ── */
+  .tool-card {
+    display: block;
+    text-decoration: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 22px;
+    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s, background 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .tool-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--card-accent, var(--gold-dim)), transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .tool-card:hover {
+    border-color: var(--card-accent, var(--gold-dim));
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5), 0 0 0 1px var(--card-accent, var(--gold-dim));
+    background: var(--panel);
+  }
+
+  .tool-card:hover::before { opacity: 1; }
+
+  .card-icon {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    margin-bottom: 16px;
+    background: var(--card-icon-bg, rgba(201,168,76,0.1));
+    border: 1px solid var(--card-accent, var(--gold-dim));
+    flex-shrink: 0;
+  }
+
+  .tool-card h3 {
+    font-family: 'Cinzel', serif;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold-light);
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+
+  .tool-card p {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+    font-weight: 400;
+  }
+
+  .card-arrow {
+    position: absolute;
+    bottom: 20px; right: 20px;
+    color: var(--text-faint);
+    font-size: 0.85rem;
+    transition: color 0.2s, transform 0.2s;
+  }
+
+  .tool-card:hover .card-arrow {
+    color: var(--card-accent, var(--gold));
+    transform: translate(2px, -2px);
+  }
+
+  /* ── Card accent colours ── */
+  .accent-gold   { --card-accent: #c9a84c; --card-icon-bg: rgba(201,168,76,0.08); }
+  .accent-purple { --card-accent: #7b5ea7; --card-icon-bg: rgba(107,79,160,0.1);  }
+  .accent-green  { --card-accent: #3db87a; --card-icon-bg: rgba(61,184,122,0.08); }
+  .accent-blue   { --card-accent: #4a90d9; --card-icon-bg: rgba(74,144,217,0.08); }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    padding: 0 0 40px;
+    color: var(--text-faint);
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  footer a { color: var(--gold-dim); text-decoration: none; }
+  footer a:hover { color: var(--gold); }
+
+  @media (max-width: 560px) {
+    .hero { padding: 56px 20px 48px; }
+    .tools-section { padding: 40px 16px 60px; }
+    .tools-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-icon">⚔</div>
+  <h1>Phantom's MTG Tools</h1>
+  <p class="subtitle">A collection of tools for Magic: The Gathering</p>
+</div>
+
+<div class="tools-section">
+  <p class="section-label">Available Tools</p>
+
+  <div class="tools-grid">
+
+    <a class="tool-card accent-gold" href="https://phantomdenied.github.io/EDHFetch/">
+      <div class="card-icon">✦</div>
+      <h3>EDHFetch</h3>
+      <p>Track new card recommendations from EDHRec for your saved commanders. Supports partners and backgrounds.</p>
+      <span class="card-arrow">↗</span>
+    </a>
+
+    <a class="tool-card accent-purple" href="https://phantomdenied.github.io/LifeTracker/">
+      <div class="card-icon">♥</div>
+      <h3>Life Tracker</h3>
+      <p>All-in-one MTG life tracker. Track life totals, commander damage, and more at the table.</p>
+      <span class="card-arrow">↗</span>
+    </a>
+
+    <a class="tool-card accent-green" href="https://phantomdenied.github.io/Compare/">
+      <div class="card-icon">⊞</div>
+      <h3>Compare</h3>
+      <p>Compare your Manabox collection CSV against a card want list to find what you still need.</p>
+      <span class="card-arrow">↗</span>
+    </a>
+
+    <a class="tool-card accent-blue" href="https://phantomdenied.github.io/BL-Oracle/">
+      <div class="card-icon">◈</div>
+      <h3>The Oracle</h3>
+      <p>Card lookup and rules reference tool for Magic: The Gathering.</p>
+      <span class="card-arrow">↗</span>
+    </a>
+
+  </div>
+</div>
+
+<footer>
+  Built by <a href="https://github.com/phantomdenied">phantomdenied</a>
+</footer>
+
+</body>
+</html>
