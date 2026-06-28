@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>Dungeon Zero</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#08080f; --surface:#0e0e1c; --panel:#131325; --border:#1e1e3a;
+  --gold:#c9a84c; --gold-l:#e8c96e; --gold-d:#7a6030;
+  --purple:#6b4fa0; --text:#ddd8cc; --dim:#7a7590; --faint:#3a3555;
+  --red:#e05555; --green:#3db87a; --blue:#4a90d9;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{
+  font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
+  display:flex;flex-direction:column;align-items:center;
+  height:100dvh;
+}
+#game{
+  width:100%;max-width:430px;height:100%;
+  display:flex;flex-direction:column;
+  padding:0 10px;
+  padding-bottom:max(8px, env(safe-area-inset-bottom));
+}
+
+/* TOP BAR */
+#top-bar{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:8px 0 6px;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.stat{display:flex;align-items:center;gap:5px;}
+.stat-icon{font-size:1rem;line-height:1;}
+.stat-val{font-family:'Cinzel',serif;font-size:1.05rem;font-weight:700;min-width:28px;text-align:center;}
+#hp-val{color:var(--red);}
+#coin-val{color:var(--gold);}
+#floor-badge{font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:2px;color:var(--dim);text-transform:uppercase;}
+
+/* GRID */
+#grid-wrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:0;}
+#dungeon{touch-action:none;display:block;border-radius:4px;}
+
+/* LOG */
+#log{
+  flex-shrink:0;height:30px;display:flex;align-items:center;justify-content:center;
+  font-size:0.76rem;color:var(--dim);text-align:center;padding:0 4px;
+  transition:color 0.2s;
+}
+#log.good{color:var(--green);}
+#log.bad{color:var(--red);}
+#log.gold{color:var(--gold-l);}
+#log.purple{color:#c4a8f0;}
+
+/* CONTROLS */
+#controls{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:6px;padding-top:2px;}
+#move-info{font-size:0.76rem;color:var(--dim);text-align:center;min-height:18px;}
+#move-info b{color:var(--gold-l);}
+
+/* DICE */
+#dice-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;}
+#dice-btn{
+  width:72px;height:72px;border-radius:14px;
+  border:2px solid var(--gold-d);background:var(--surface);
+  color:var(--gold-l);font-size:2.2rem;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:border-color 0.15s,box-shadow 0.15s;
+  user-select:none;
+}
+#dice-btn:active{transform:scale(0.9);}
+#dice-btn.rolling{animation:spin 0.35s ease;}
+@keyframes spin{0%{transform:rotate(-20deg) scale(0.85);}50%{transform:rotate(15deg) scale(1.1);}100%{transform:rotate(0) scale(1);}}
+#dice-label{font-size:0.72rem;color:var(--faint);letter-spacing:1px;text-transform:uppercase;}
+
+/* D-PAD */
+#dpad{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;width:162px;}
+#dpad.hidden{display:none;}
+.db{
+  width:50px;height:50px;border-radius:10px;
+  border:1px solid var(--border);background:var(--surface);
+  color:var(--text);font-size:1.3rem;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:background 0.1s,border-color 0.1s,opacity 0.1s;
+  user-select:none;
+}
+.db:active{background:var(--panel);transform:scale(0.88);}
+.db.active{border-color:var(--gold);color:var(--gold);background:rgba(201,168,76,0.12);}
+.db.dim{opacity:0.18;pointer-events:none;}
+.db.ghost{border-color:transparent;background:transparent;pointer-events:none;color:var(--faint);}
+
+/* OVERLAY */
+#overlay{
+  position:fixed;inset:0;background:rgba(8,8,15,0.93);
+  display:flex;align-items:center;justify-content:center;
+  z-index:50;padding:20px;
+}
+#overlay.hidden{display:none;}
+.ov-card{
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:16px;padding:24px 20px;width:100%;max-width:340px;
+}
+.ov-title{font-family:'Cinzel',serif;font-size:1.1rem;color:var(--gold-l);margin-bottom:14px;text-align:center;letter-spacing:1px;}
+.ov-row{display:flex;justify-content:space-between;padding:5px 0;font-size:0.85rem;border-bottom:1px solid var(--faint);}
+.ov-row:last-of-type{border:none;}
+.ov-label{color:var(--dim);}
+.ov-val{font-weight:600;}
+.pos{color:var(--green);} .neg{color:var(--red);} .neu{color:var(--gold);}
+.ov-btn{
+  width:100%;margin-top:18px;padding:13px;border-radius:10px;
+  border:1px solid var(--gold-d);background:rgba(201,168,76,0.08);
+  color:var(--gold-l);font-family:'Cinzel',serif;font-size:0.88rem;
+  letter-spacing:1px;cursor:pointer;
+}
+.ov-btn:active{background:rgba(201,168,76,0.2);}
+.ov-btn.danger{border-color:#7a2020;background:rgba(224,85,85,0.08);color:var(--red);}
+
+/* MYSTERY OVERLAY */
+#mystery{
+  position:fixed;inset:0;background:rgba(8,8,15,0.88);
+  display:flex;align-items:center;justify-content:center;
+  z-index:80;padding:20px;
+}
+#mystery.hidden{display:none;}
+.my-card{
+  background:#100d20;border:1px solid var(--purple);
+  border-radius:16px;padding:28px 24px;text-align:center;
+  max-width:280px;width:100%;
+}
+.my-title{font-family:'Cinzel',serif;color:#c4a8f0;font-size:1rem;margin-bottom:6px;}
+.my-desc{font-size:0.8rem;color:var(--dim);margin-bottom:18px;}
+#my-dice{
+  width:68px;height:68px;border-radius:14px;
+  border:2px solid var(--purple);background:rgba(107,79,160,0.2);
+  color:#c4a8f0;font-size:2rem;cursor:pointer;margin:0 auto;
+  display:flex;align-items:center;justify-content:center;
+}
+#my-dice:active{transform:scale(0.88);}
+#my-dice.rolling{animation:spin 0.35s ease;}
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="top-bar">
+    <div class="stat">
+      <a href="../" style="color:var(--faint);font-size:0.75rem;text-decoration:none;letter-spacing:1px;margin-right:6px;">←</a>
+      <span class="stat-icon">❤</span>
+      <span class="stat-val" id="hp-val">10</span>
+    </div>
+    <span id="floor-badge">Floor 1</span>
+    <div class="stat">
+      <span class="stat-val" id="coin-val">0</span>
+      <span class="stat-icon">¢</span>
+    </div>
+  </div>
+
+  <div id="grid-wrap">
+    <canvas id="dungeon"></canvas>
+  </div>
+
+  <div id="log" class="gold">— Enter the dungeon —</div>
+
+  <div id="controls">
+    <div id="move-info"></div>
+    <div id="dice-wrap">
+      <button id="dice-btn">⚀</button>
+      <div id="dice-label">Tap to Roll</div>
+    </div>
+    <div id="dpad" class="hidden">
+      <button class="db" data-d="nw">↖</button>
+      <button class="db" data-d="n">↑</button>
+      <button class="db" data-d="ne">↗</button>
+      <button class="db" data-d="w">←</button>
+      <div class="db ghost">·</div>
+      <button class="db" data-d="e">→</button>
+      <button class="db" data-d="sw">↙</button>
+      <button class="db" data-d="s">↓</button>
+      <button class="db" data-d="se">↘</button>
+    </div>
+  </div>
+</div>
+
+<div id="overlay" class="hidden">
+  <div class="ov-card" id="ov-card"></div>
+</div>
+
+<div id="mystery" class="hidden">
+  <div class="my-card">
+    <div class="my-title" id="my-title">Mystery!</div>
+    <div class="my-desc" id="my-desc">Roll to reveal</div>
+    <button id="my-dice">?</button>
+  </div>
+</div>
+
+<script>
+// ─── FLOOR DATA ───────────────────────────────────────────────
+// Grid chars: #=wall .=floor @=start >=stairs c=coin C=chest
+// e=enemy(fixed) E=enemy(mystery) h=heart(fixed) H=heart(mystery)
+// w=spiderweb k=key L=lock T=teleporter
+const FLOORS = [
+  {
+    num:1,
+    layout:[
+      '##########',
+      '#@...c...#',
+      '#........#',
+      '#........#',
+      '#........#',
+      '#....e...#',
+      '#........#',
+      '#...h....#',
+      '#........#',
+      '#........#',
+      '#.......>#',
+      '##########',
+    ],
+    vals:{'5,5':3,'4,7':3},
+    teles:[],
+  },
+  {
+    num:2,
+    layout:[
+      '##########',
+      '#@.......#',
+      '#.E......#',
+      '#........#',
+      '#..#####.#',
+      '#..#.....#',
+      '#..#..C..#',
+      '#..#.....#',
+      '#..#..c..#',
+      '#..#.....#',
+      '#........#',
+      '#.......>#',
+      '##########',
+    ],
+    vals:{},
+    teles:[],
+  },
+  {
+    num:3,
+    layout:[
+      '##########',
+      '#@...c...#',
+      '#........#',
+      '#........#',
+      '#....w...#',
+      '#........#',
+      '#.....c..#',
+      '#........#',
+      '#...H....#',
+      '#........#',
+      '#........#',
+      '#.......>#',
+      '##########',
+    ],
+    vals:{},
+    teles:[],
+  },
+  {
+    num:4,
+    layout:[
+      '##########',
+      '#@.......#',
+      '#....k...#',
+      '#........#',
+      '####L#####',
+      '#........#',
+      '#....e...#',
+      '#........#',
+      '#....c...#',
+      '#........#',
+      '#........#',
+      '#.......>#',
+      '##########',
+    ],
+    vals:{'5,6':4},
+    teles:[],
+  },
+  {
+    num:5,
+    layout:[
+      '##########',
+      '#@...T...#',
+      '#........#',
+      '#.######.#',
+      '#.#......#',
+      '#.#..T...#',
+      '#.#......#',
+      '#.#..e...#',
+      '#.#......#',
+      '#.#.....>#',
+      '#........#',
+      '##########',
+    ],
+    vals:{'5,7':5},
+    teles:[{a:{x:5,y:1},b:{x:5,y:5}}],
+  },
+];
+
+const FACES = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+
+// ─── STATE ────────────────────────────────────────────────────
+let S = {
+  fi:0, hp:10, coins:0,
+  pos:{x:1,y:1},
+  grid:[], objs:{}, hasKey:false,
+  phase:'roll',       // roll|choose|moving|mystery|floor-end|dead|win
+  roll:0, ortho:true, moves:0, dir:null, locked:false,
+  // stats
+  sHP:10, sCoins:0, hpG:0, hpL:0, cG:0, cL:0, deaths:0,
+  // mystery
+  myQ:[], myCb:null,
+  // animation
+  animPath:[], animIdx:0, animTimer:null,
+};
+
+// ─── CANVAS ───────────────────────────────────────────────────
+const canvas = document.getElementById('dungeon');
+const ctx = canvas.getContext('2d');
+let CELL=32, DPR=1;
+
+function setupCanvas(){
+  const wrap = document.getElementById('grid-wrap');
+  const fl = FLOORS[S.fi];
+  const cols = fl.layout[0].length;
+  const rows = fl.layout.length;
+  const cw = Math.floor((wrap.clientWidth) / cols);
+  const ch = Math.floor((wrap.clientHeight) / rows);
+  CELL = Math.min(cw, ch, 40);
+  DPR = window.devicePixelRatio || 1;
+  const gw = CELL * cols, gh = CELL * rows;
+  canvas.width = gw * DPR; canvas.height = gh * DPR;
+  canvas.style.width = gw+'px'; canvas.style.height = gh+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+
+// ─── LOAD FLOOR ───────────────────────────────────────────────
+function loadFloor(fi){
+  const fl = FLOORS[fi];
+  S.fi=fi; S.grid=fl.layout; S.hasKey=false;
+  S.phase='roll'; S.moves=0; S.dir=null; S.locked=false;
+  S.animPath=[]; S.animIdx=0; clearTimeout(S.animTimer);
+
+  // find start
+  for(let y=0;y<fl.layout.length;y++)
+    for(let x=0;x<fl.layout[y].length;x++)
+      if(fl.layout[y][x]==='@') S.pos={x,y};
+
+  // build objects
+  S.objs={};
+  for(let y=0;y<fl.layout.length;y++){
+    for(let x=0;x<fl.layout[y].length;x++){
+      const ch=fl.layout[y][x];
+      if(!'#.@'.includes(ch)){
+        const k=`${x},${y}`;
+        S.objs[k]={type:ch, val:(fl.vals&&fl.vals[k]!==undefined?fl.vals[k]:null), used:false};
+      }
+    }
+  }
+
+  S.sHP=S.hp; S.sCoins=S.coins;
+  S.hpG=0; S.hpL=0; S.cG=0; S.cL=0;
+
+  document.getElementById('floor-badge').textContent=`Floor ${fl.num}`;
+  setupCanvas();
+  render();
+  updateTopBar();
+  showRollPhase();
+  setLog(`Floor ${fl.num} — reach the stairs!`,'gold');
+}
+
+// ─── RENDER ───────────────────────────────────────────────────
+const C={
+  wall:'#090918', wallIn:'#0d0d22',
+  floorA:'#0f0f28', floorB:'#111130',
+  player:'#f4edb0', playerGlow:'rgba(244,237,176,0.45)',
+  coin:'#d4a83c', coinTxt:'#fff',
+  chest:'#7a4810', chestLid:'#c9a84c',
+  enemy:'#cc2233', enemyTxt:'#fff',
+  mEnemy:'#880022',
+  heart:'#dd4488', heartTxt:'#fff',
+  mHeart:'#993366',
+  web:'#8888aa',
+  key:'#e8c060',
+  lock:'#3a6688',
+  stairBg:'#1a3a5a', stairFg:'#60b8ee',
+  tele:'#8040cc', teleGlow:'rgba(160,80,220,0.3)',
+  pathHl:'rgba(201,168,76,0.18)',
+  pathEdge:'rgba(201,168,76,0.55)',
+};
+
+function render(){
+  if(!S.grid.length) return;
+  const rows=S.grid.length, cols=S.grid[0].length;
+  ctx.clearRect(0,0,cols*CELL,rows*CELL);
+  for(let y=0;y<rows;y++)
+    for(let x=0;x<cols;x++)
+      drawCell(x,y);
+  // path highlight
+  for(const p of S.animPath.slice(S.animIdx)){
+    const px=p.x*CELL, py=p.y*CELL;
+    ctx.fillStyle=C.pathHl;
+    ctx.fillRect(px,py,CELL,CELL);
+    ctx.strokeStyle=C.pathEdge;
+    ctx.lineWidth=1;
+    ctx.strokeRect(px+0.5,py+0.5,CELL-1,CELL-1);
+  }
+  drawPlayer(S.pos.x,S.pos.y);
+}
+
+function drawCell(x,y){
+  const px=x*CELL, py=y*CELL;
+  const ch=S.grid[y][x];
+  const k=`${x},${y}`;
+  const obj=S.objs[k];
+  const isLock = ch==='L' && !S.hasKey;
+
+  if(ch==='#' || isLock){
+    ctx.fillStyle=C.wall;
+    ctx.fillRect(px,py,CELL,CELL);
+    ctx.fillStyle=C.wallIn;
+    ctx.fillRect(px+1,py+1,CELL-2,CELL-2);
+    if(isLock){
+      drawIcon(px+CELL/2,py+CELL/2,'🔒',CELL*0.45);
+    }
+    return;
+  }
+
+  // floor
+  ctx.fillStyle=(x+y)%2===0?C.floorA:C.floorB;
+  ctx.fillRect(px,py,CELL,CELL);
+
+  if(!obj) return;
+  if(obj.used){ctx.globalAlpha=0.15;}
+
+  const cx=px+CELL/2, cy=py+CELL/2;
+  switch(obj.type){
+    case 'c': drawCoin(cx,cy); break;
+    case 'C': drawChest(px,py,cx,cy); break;
+    case 'e': drawEnemy(cx,cy,obj.val,false); break;
+    case 'E': drawEnemy(cx,cy,null,true); break;
+    case 'h': drawHeart(cx,cy,obj.val,false); break;
+    case 'H': drawHeart(cx,cy,null,true); break;
+    case 'w': drawWeb(cx,cy); break;
+    case 'k': drawKey(cx,cy); break;
+    case '>': drawStairs(px,py,cx,cy); break;
+    case 'T': drawTele(cx,cy,obj.used); break;
+  }
+  ctx.globalAlpha=1;
+}
+
+function drawCoin(cx,cy){
+  ctx.fillStyle=C.coin;
+  ctx.beginPath();ctx.arc(cx,cy,CELL*0.24,0,Math.PI*2);ctx.fill();
+  txt(cx,cy,'¢',C.coinTxt,CELL*0.28,'600');
+}
+function drawChest(px,py,cx,cy){
+  ctx.fillStyle=C.chest;
+  ctx.fillRect(px+3,py+CELL*0.38,CELL-6,CELL*0.45);
+  ctx.fillStyle=C.chestLid;
+  ctx.fillRect(px+3,py+CELL*0.25,CELL-6,CELL*0.18);
+  txt(cx,cy+2,'?',C.chestLid,CELL*0.28,'600');
+}
+function drawEnemy(cx,cy,val,mystery){
+  ctx.fillStyle=mystery?C.mEnemy:C.enemy;
+  ctx.beginPath();
+  ctx.moveTo(cx,cy-CELL*0.3);
+  ctx.lineTo(cx+CELL*0.3,cy);
+  ctx.lineTo(cx,cy+CELL*0.3);
+  ctx.lineTo(cx-CELL*0.3,cy);
+  ctx.closePath();ctx.fill();
+  txt(cx,cy+1,mystery?'?':(val??'?'),C.enemyTxt,CELL*0.26,'700');
+}
+function drawHeart(cx,cy,val,mystery){
+  ctx.fillStyle=mystery?C.mHeart:C.heart;
+  const r=CELL*0.22;
+  ctx.beginPath();
+  ctx.moveTo(cx,cy+r*1.3);
+  ctx.bezierCurveTo(cx-r*2,cy-r*0.5,cx-r*2,cy-r*1.5,cx,cy-r*0.5);
+  ctx.bezierCurveTo(cx+r*2,cy-r*1.5,cx+r*2,cy-r*0.5,cx,cy+r*1.3);
+  ctx.closePath();ctx.fill();
+  txt(cx,cy+1,mystery?'?':(val??'?'),C.heartTxt,CELL*0.26,'700');
+}
+function drawWeb(cx,cy){
+  ctx.strokeStyle=C.web; ctx.lineWidth=1;
+  for(let a=0;a<Math.PI*2;a+=Math.PI/4){
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.lineTo(cx+Math.cos(a)*CELL*0.3,cy+Math.sin(a)*CELL*0.3);
+    ctx.stroke();
+  }
+  for(let r=0.1;r<=0.31;r+=0.1){
+    ctx.beginPath();
+    ctx.arc(cx,cy,CELL*r,0,Math.PI*2);
+    ctx.stroke();
+  }
+}
+function drawKey(cx,cy){
+  ctx.strokeStyle=C.key; ctx.lineWidth=2; ctx.lineCap='round';
+  ctx.beginPath();ctx.arc(cx-2,cy-2,CELL*0.17,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx+CELL*0.08,cy+2);ctx.lineTo(cx+CELL*0.3,cy+CELL*0.28);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx+CELL*0.18,cy+CELL*0.17);ctx.lineTo(cx+CELL*0.28,cy+CELL*0.1);ctx.stroke();
+}
+function drawStairs(px,py,cx,cy){
+  ctx.fillStyle=C.stairBg;
+  ctx.fillRect(px+2,py+2,CELL-4,CELL-4);
+  ctx.fillStyle=C.stairFg;
+  const sw=CELL-8, sh=(CELL-8)/4;
+  for(let i=0;i<4;i++){
+    const si=3-i;
+    ctx.fillRect(px+4+i*(sw/4*0.18),py+4+si*sh+1,sw-i*(sw*0.18),sh-1);
+  }
+}
+function drawTele(cx,cy,used){
+  if(used) return;
+  ctx.fillStyle=C.teleGlow;
+  ctx.beginPath();ctx.arc(cx,cy,CELL*0.36,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle=C.tele; ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(cx,cy,CELL*0.26,0,Math.PI*2);ctx.stroke();
+  txt(cx,cy,'✦','#c4a8f0',CELL*0.3,'400');
+}
+function drawPlayer(x,y){
+  const px=x*CELL+CELL/2, py=y*CELL+CELL/2;
+  ctx.shadowColor=C.playerGlow; ctx.shadowBlur=10;
+  ctx.fillStyle=C.player;
+  ctx.beginPath();ctx.arc(px,py,CELL*0.28,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
+  txt(px,py,'@','#08080f',CELL*0.26,'700');
+}
+function drawIcon(cx,cy,icon,size){
+  ctx.font=`${size}px sans-serif`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(icon,cx,cy);
+}
+function txt(cx,cy,t,color,size,weight='600'){
+  ctx.fillStyle=color;
+  ctx.font=`${weight} ${size}px Inter,sans-serif`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(t,cx,cy);
+}
+
+// ─── UI HELPERS ───────────────────────────────────────────────
+function updateTopBar(){
+  document.getElementById('hp-val').textContent=S.hp;
+  document.getElementById('coin-val').textContent=S.coins;
+}
+function setLog(msg,cls=''){
+  const el=document.getElementById('log');
+  el.textContent=msg; el.className=cls;
+}
+function setMoveInfo(msg){
+  document.getElementById('move-info').innerHTML=msg;
+}
+
+// ─── PHASES ───────────────────────────────────────────────────
+function showRollPhase(){
+  S.phase='roll';
+  document.getElementById('dice-wrap').style.display='flex';
+  document.getElementById('dpad').classList.add('hidden');
+  setMoveInfo('');
+  document.getElementById('dice-btn').textContent=FACES[0];
+  document.getElementById('dice-label').textContent='Tap to Roll';
+}
+
+function showChoosePhase(){
+  S.phase='choose';
+  document.getElementById('dice-wrap').style.display='none';
+  document.getElementById('dpad').classList.remove('hidden');
+  updateDpad();
+  const type = S.ortho ? 'orthogonal' : 'diagonal';
+  setMoveInfo(`Roll <b>${S.roll}</b> — ${type} — pick direction`);
+}
+
+function updateDpad(){
+  document.querySelectorAll('.db[data-d]').forEach(btn=>{
+    const d=btn.getAttribute('data-d');
+    const isOrtho = !d.includes('n')+!d.includes('s') !== 2 || d.length===1;
+    const isDiagBtn = d.length===2;
+    const isOrthoBtn = d.length===1;
+    if(S.ortho){
+      if(isDiagBtn){btn.classList.add('dim');btn.classList.remove('active');}
+      else{btn.classList.remove('dim');}
+    } else {
+      if(isOrthoBtn){btn.classList.add('dim');btn.classList.remove('active');}
+      else{btn.classList.remove('dim');}
+    }
+    // grey out if wall in that direction
+    const dv=dirVec(d);
+    const nx=S.pos.x+dv.x, ny=S.pos.y+dv.y;
+    if(!btn.classList.contains('dim') && isWall(nx,ny)){
+      btn.classList.add('dim');
+    }
+    if(S.dir===d) btn.classList.add('active');
+    else btn.classList.remove('active');
+  });
+}
+
+function showMovingPhase(){
+  S.phase='moving';
+  document.getElementById('dpad').classList.add('hidden');
+  document.getElementById('dice-wrap').style.display='none';
+}
+
+// ─── WALL CHECK ───────────────────────────────────────────────
+function isWall(x,y){
+  const g=S.grid;
+  if(y<0||y>=g.length||x<0||x>=g[0].length) return true;
+  const ch=g[y][x];
+  if(ch==='#') return true;
+  if(ch==='L'&&!S.hasKey) return true;
+  return false;
+}
+
+// ─── DIR VECTORS ──────────────────────────────────────────────
+function dirVec(d){
+  const m={n:{x:0,y:-1},s:{x:0,y:1},e:{x:1,y:0},w:{x:-1,y:0},
+           ne:{x:1,y:-1},nw:{x:-1,y:-1},se:{x:1,y:1},sw:{x:-1,y:1}};
+  return m[d];
+}
+
+// ─── CALCULATE PATH (one segment in current dir until wall) ───
+function stepDir(pos,dv){
+  // Move one step; returns new pos or null if blocked
+  const nx=pos.x+dv.x, ny=pos.y+dv.y;
+  if(isWall(nx,ny)) return null;
+  return {x:nx,y:ny};
+}
+
+// Build path of N steps starting from pos in direction dv, bouncing at walls
+function buildPath(pos,dv,steps){
+  const path=[];
+  let p={...pos}, d={...dv};
+  for(let i=0;i<steps;i++){
+    let np=stepDir(p,d);
+    if(!np){
+      // bounce
+      const nd=bounce(p,d);
+      if(!nd) break;
+      d=nd;
+      np=stepDir(p,d);
+      if(!np) break;
+    }
+    p={...np};
+    path.push({...p, dv:{...d}});
+  }
+  return path;
+}
+
+function bounce(pos,dv){
+  const ox=dv.x, oy=dv.y;
+  const isOrtho=ox===0||oy===0;
+  let cands;
+  if(isOrtho){
+    if(ox===0) cands=[{x:1,y:0},{x:-1,y:0}];
+    else cands=[{x:0,y:-1},{x:0,y:1}];
+  } else {
+    cands=[{x:ox,y:-oy},{x:-ox,y:oy}];
+  }
+  for(const c of cands){
+    if(!isWall(pos.x+c.x,pos.y+c.y)) return c;
+  }
+  const rev={x:-ox,y:-oy};
+  if(!isWall(pos.x+rev.x,pos.y+rev.y)) return rev;
+  return null;
+}
+
+// ─── DICE ROLL ────────────────────────────────────────────────
+function rollDie(){
+  if(S.phase!=='roll'||S.locked) return;
+  S.locked=true;
+  const btn=document.getElementById('dice-btn');
+  btn.classList.add('rolling');
+  let n=0;
+  const interval=setInterval(()=>{
+    btn.textContent=FACES[Math.floor(Math.random()*6)];
+    n++;
+    if(n>8){
+      clearInterval(interval);
+      const result=Math.floor(Math.random()*6)+1;
+      S.roll=result;
+      S.ortho=(result%2===0);
+      S.moves=result;
+      btn.textContent=FACES[result-1];
+      btn.classList.remove('rolling');
+      S.locked=false;
+      showChoosePhase();
+    }
+  },45);
+}
+
+// ─── DIRECTION CHOSEN ─────────────────────────────────────────
+function chooseDir(d){
+  if(S.phase!=='choose') return;
+  if(S.locked) return;
+
+  const dv=dirVec(d);
+  const isDiag=d.length===2;
+  if(S.ortho===isDiag) return; // wrong type
+
+  S.dir=d;
+
+  // Build full path
+  S.animPath=buildPath(S.pos,dv,S.moves);
+  S.animIdx=0;
+
+  if(S.animPath.length===0){
+    setLog('Nowhere to go!','bad');
+    showRollPhase();
+    return;
+  }
+
+  showMovingPhase();
+  updateDpad();
+  runNextStep();
+}
+
+// ─── STEP ANIMATION ───────────────────────────────────────────
+function runNextStep(){
+  if(S.animIdx>=S.animPath.length){
+    // Done
+    S.moves=0;
+    S.dir=null;
+    render();
+    setMoveInfo('');
+    checkMystery();
+    return;
+  }
+
+  const step=S.animPath[S.animIdx];
+  S.animIdx++;
+  S.moves--;
+
+  // Move player
+  S.pos={x:step.x,y:step.y};
+  render();
+  setMoveInfo(`Moves left: <b>${S.moves}</b>`);
+
+  // Interact with cell
+  const k=`${step.x},${step.y}`;
+  const obj=S.objs[k];
+  if(obj&&!obj.used){
+    handleObject(k,obj);
+  }
+  // After interaction, continue (unless paused for mystery)
+  if(S.phase!=='mystery'){
+    S.animTimer=setTimeout(runNextStep,180);
+  }
+}
+
+// ─── OBJECT INTERACTION ───────────────────────────────────────
+function handleObject(k,obj){
+  obj.used=true;
+  switch(obj.type){
+    case '>':
+      // Stairs - player can take or continue; we auto-take on first contact
+      obj.used=false; // can use multiple times
+      clearTimeout(S.animTimer);
+      S.animPath=[];
+      offerStairs();
+      return;
+
+    case 'c':
+      S.coins++; S.cG++;
+      updateTopBar();
+      setLog(`Found 1 coin! Total: ${S.coins}¢`,'gold');
+      break;
+
+    case 'C':
+      // chest - need mystery roll
+      clearTimeout(S.animTimer);
+      startMystery('Treasure Chest','Roll to see how many coins!',v=>{
+        S.coins+=v; S.cG+=v;
+        updateTopBar();
+        setLog(`Chest: +${v} coins!`,'gold');
+        S.animTimer=setTimeout(runNextStep,200);
+      });
+      return;
+
+    case 'e':
+      S.hp-=obj.val; S.hpL+=obj.val;
+      updateTopBar();
+      setLog(`Hit by enemy! -${obj.val} HP`,'bad');
+      break;
+
+    case 'E':
+      clearTimeout(S.animTimer);
+      startMystery('Mystery Enemy','Roll to reveal its strength!',v=>{
+        obj.val=v;
+        S.hp-=v; S.hpL+=v;
+        updateTopBar();
+        setLog(`Mystery enemy: -${v} HP`,'bad');
+        S.animTimer=setTimeout(runNextStep,200);
+      });
+      return;
+
+    case 'h':
+      S.hp=Math.min(25,S.hp+obj.val); S.hpG+=obj.val;
+      updateTopBar();
+      setLog(`Heart: +${obj.val} HP`,'good');
+      break;
+
+    case 'H':
+      clearTimeout(S.animTimer);
+      startMystery('Mystery Heart','Roll to see how much HP you restore!',v=>{
+        S.hp=Math.min(25,S.hp+v); S.hpG+=v;
+        updateTopBar();
+        setLog(`Mystery heart: +${v} HP`,'good');
+        S.animTimer=setTimeout(runNextStep,200);
+      });
+      return;
+
+    case 'w':
+      // spiderweb - stop movement, lose coins
+      clearTimeout(S.animTimer);
+      S.animPath=[];
+      setLog('Caught in a web!','bad');
+      startMystery('Spiderweb Trap','Roll — you lose that many coins!',v=>{
+        const lost=Math.min(v,S.coins);
+        S.coins-=lost; S.cL+=lost;
+        updateTopBar();
+        setLog(`Web: -${lost} coins`,'bad');
+        // movement stops
+        S.moves=0;
+        S.animTimer=setTimeout(()=>{
+          setMoveInfo('');
+          showRollPhase();
+        },400);
+      });
+      return;
+
+    case 'k':
+      S.hasKey=true;
+      setLog('Picked up the key! 🗝','gold');
+      break;
+
+    case 'T': {
+      const fl=FLOORS[S.fi];
+      let dest=null;
+      for(const tp of fl.teles){
+        const ka=`${tp.a.x},${tp.a.y}`, kb=`${tp.b.x},${tp.b.y}`;
+        if(k===ka) dest=tp.b;
+        else if(k===kb) dest=tp.a;
+      }
+      if(dest){
+        S.pos={...dest};
+        // Recalculate remaining path from teleport destination in same direction
+        if(S.moves>0 && S.animIdx>0){
+          const dv=S.animPath[S.animIdx-1].dv;
+          S.animPath=buildPath(S.pos,dv,S.moves);
+          S.animIdx=0;
+        } else {
+          S.animPath=[];
+        }
+        setLog('Teleported!','purple');
+        render();
+      }
+      obj.used=false; // teleporter reusable
+      break;
+    }
+  }
+}
+
+// ─── MYSTERY ROLL ─────────────────────────────────────────────
+function startMystery(title,desc,cb){
+  S.phase='mystery';
+  S.myCb=cb;
+  document.getElementById('my-title').textContent=title;
+  document.getElementById('my-desc').textContent=desc;
+  document.getElementById('my-dice').textContent='?';
+  document.getElementById('mystery').classList.remove('hidden');
+}
+
+function rollMystery(){
+  const btn=document.getElementById('my-dice');
+  if(btn.classList.contains('rolling')) return;
+  btn.classList.add('rolling');
+  let n=0;
+  const iv=setInterval(()=>{
+    btn.textContent=FACES[Math.floor(Math.random()*6)];
+    n++;
+    if(n>8){
+      clearInterval(iv);
+      const r=Math.floor(Math.random()*6)+1;
+      btn.textContent=FACES[r-1];
+      btn.classList.remove('rolling');
+      setTimeout(()=>{
+        document.getElementById('mystery').classList.add('hidden');
+        S.phase='moving';
+        const cb=S.myCb;
+        S.myCb=null;
+        if(cb) cb(r);
+      },300);
+    }
+  },45);
+}
+
+// Check if mystery queue is empty and return to roll
+function checkMystery(){
+  if(S.phase==='moving'){
+    showRollPhase();
+  }
+}
+
+// ─── STAIRS / FLOOR END ───────────────────────────────────────
+function offerStairs(){
+  S.phase='floor-end';
+  clearTimeout(S.animTimer);
+  const fl=FLOORS[S.fi];
+  const isLast=S.fi===FLOORS.length-1;
+
+  // Compute ending HP & coins
+  const endHP=S.hp;
+  const endCoins=Math.max(0,S.coins);
+
+  const card=document.getElementById('ov-card');
+  card.innerHTML=`
+    <div class="ov-title">${isLast?'Victory!':'Floor '+fl.num+' Complete'}</div>
+    <div class="ov-row"><span class="ov-label">Starting HP</span><span class="ov-val neu">${S.sHP}</span></div>
+    <div class="ov-row"><span class="ov-label">+ Healed</span><span class="ov-val pos">+${S.hpG}</span></div>
+    <div class="ov-row"><span class="ov-label">− Damage</span><span class="ov-val neg">−${S.hpL}</span></div>
+    <div class="ov-row"><span class="ov-label">Ending HP</span><span class="ov-val ${endHP>0?'pos':'neg'}">${endHP}</span></div>
+    <div style="margin:6px 0;border-bottom:1px solid var(--faint);"></div>
+    <div class="ov-row"><span class="ov-label">Starting ¢</span><span class="ov-val neu">${S.sCoins}</span></div>
+    <div class="ov-row"><span class="ov-label">+ Found</span><span class="ov-val pos">+${S.cG}</span></div>
+    <div class="ov-row"><span class="ov-label">− Lost</span><span class="ov-val neg">−${S.cL}</span></div>
+    <div class="ov-row"><span class="ov-label">Ending ¢</span><span class="ov-val pos">${endCoins}</span></div>
+    ${endHP<=0?`<div style="color:var(--red);font-size:0.8rem;text-align:center;margin-top:10px;">☠ You died — next floor starts at 10 HP, 0¢</div>`:''}
+    ${isLast?`
+      <div style="text-align:center;margin-top:10px;font-size:0.82rem;color:var(--dim)">Total deaths: ${S.deaths}</div>
+      <button class="ov-btn" onclick="restartGame()">Play Again</button>
+    `:`
+      <button class="ov-btn" onclick="descend()" id="descend-btn">Descend to Floor ${fl.num+1}</button>
+      <button class="ov-btn" style="margin-top:6px;background:none;border-color:var(--faint);color:var(--dim);font-size:0.8rem;" onclick="stayOnFloor()">Keep Exploring</button>
+    `}
+  `;
+  document.getElementById('overlay').classList.remove('hidden');
+}
+
+function descend(){
+  document.getElementById('overlay').classList.add('hidden');
+  // Handle death
+  if(S.hp<=0){
+    S.deaths++;
+    S.hp=10; S.coins=0;
+  } else {
+    S.coins=Math.max(0,S.coins);
+  }
+  if(S.fi+1>=FLOORS.length){
+    restartGame();
+  } else {
+    loadFloor(S.fi+1);
+  }
+}
+
+function stayOnFloor(){
+  document.getElementById('overlay').classList.add('hidden');
+  S.phase='roll';
+  showRollPhase();
+  setLog('Back to exploring...','gold');
+}
+
+function restartGame(){
+  document.getElementById('overlay').classList.add('hidden');
+  S.hp=10; S.coins=0; S.deaths=0;
+  loadFloor(0);
+}
+
+// ─── INPUT ────────────────────────────────────────────────────
+document.getElementById('dice-btn').addEventListener('click',rollDie);
+document.getElementById('my-dice').addEventListener('click',rollMystery);
+
+document.querySelectorAll('.db[data-d]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    if(!btn.classList.contains('dim')) chooseDir(btn.getAttribute('data-d'));
+  });
+});
+
+// Swipe on canvas for direction
+let swipeStart=null;
+canvas.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  swipeStart={x:e.touches[0].clientX,y:e.touches[0].clientY};
+},{passive:false});
+canvas.addEventListener('touchend',e=>{
+  e.preventDefault();
+  if(!swipeStart) return;
+  const dx=e.changedTouches[0].clientX-swipeStart.x;
+  const dy=e.changedTouches[0].clientY-swipeStart.y;
+  swipeStart=null;
+  const adx=Math.abs(dx), ady=Math.abs(dy);
+  if(adx<12&&ady<12) return;
+
+  let d;
+  const isDiag=adx>0&&ady>0&&Math.min(adx,ady)/Math.max(adx,ady)>0.35;
+  if(!S.ortho&&isDiag){
+    if(dx>0&&dy<0) d='ne';
+    else if(dx<0&&dy<0) d='nw';
+    else if(dx>0&&dy>0) d='se';
+    else d='sw';
+  } else if(S.ortho){
+    if(adx>ady) d=dx>0?'e':'w';
+    else d=dy>0?'s':'n';
+  }
+  if(d&&S.phase==='choose') chooseDir(d);
+},{passive:false});
+
+// ─── INIT ─────────────────────────────────────────────────────
+window.addEventListener('resize',()=>{setupCanvas();render();});
+loadFloor(0);
+</script>
+</body>
+</html>
