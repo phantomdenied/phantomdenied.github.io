@@ -51,14 +51,23 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
 #move-info b{color:var(--gold-l);}
 
 /* DICE */
-#dice-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;}
-#dice-btn{width:70px;height:70px;border-radius:14px;border:2px solid var(--gold-d);
-  background:var(--surface);color:var(--gold-l);font-size:2.1rem;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;user-select:none;}
-#dice-btn:active{transform:scale(.9);}
-#dice-btn.rolling{animation:spin .35s ease;}
-@keyframes spin{0%{transform:rotate(-20deg) scale(.85);}50%{transform:rotate(15deg) scale(1.1);}100%{transform:rotate(0) scale(1);}}
+#dice-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;}
 #dice-label{font-size:.7rem;color:var(--faint);letter-spacing:1px;text-transform:uppercase;}
+.die-scene{width:68px;height:68px;perspective:280px;cursor:pointer;user-select:none;}
+.die-cube{width:68px;height:68px;position:relative;transform-style:preserve-3d;
+  transform:rotateX(-15deg) rotateY(20deg);}
+.die-face{position:absolute;inset:0;border-radius:13px;
+  background:linear-gradient(145deg,#f8f3ea,#e8e0cc);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.1),inset 0 3px 6px rgba(255,255,255,.7),inset 0 -2px 4px rgba(0,0,0,.08);}
+.f1{transform:translateZ(34px);}
+.f6{transform:rotateY(180deg) translateZ(34px);}
+.f2{transform:rotateY(90deg) translateZ(34px);}
+.f5{transform:rotateY(-90deg) translateZ(34px);}
+.f3{transform:rotateX(-90deg) translateZ(34px);}
+.f4{transform:rotateX(90deg) translateZ(34px);}
+.die-scene:active .die-cube{filter:brightness(.92);}
+@keyframes spin{0%{transform:rotate(-20deg) scale(.85);}50%{transform:rotate(15deg) scale(1.1);}100%{transform:rotate(0) scale(1);}}
 
 /* DPAD */
 #dpad{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;width:158px;}
@@ -156,7 +165,37 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
   <div id="controls">
     <div id="move-info"></div>
     <div id="dice-wrap">
-      <button id="dice-btn">⚀</button>
+      <div class="die-scene" id="die-scene">
+        <div class="die-cube" id="die-cube">
+          <div class="die-face f1"><svg viewBox="0 0 54 54" width="46" height="46">
+            <circle cx="27" cy="27" r="5.5" fill="#1a1830"/></svg></div>
+          <div class="die-face f2"><svg viewBox="0 0 54 54" width="46" height="46">
+            <circle cx="40" cy="14" r="5.5" fill="#1a1830"/>
+            <circle cx="14" cy="40" r="5.5" fill="#1a1830"/></svg></div>
+          <div class="die-face f3"><svg viewBox="0 0 54 54" width="46" height="46">
+            <circle cx="40" cy="14" r="5.5" fill="#1a1830"/>
+            <circle cx="27" cy="27" r="5.5" fill="#1a1830"/>
+            <circle cx="14" cy="40" r="5.5" fill="#1a1830"/></svg></div>
+          <div class="die-face f4"><svg viewBox="0 0 54 54" width="46" height="46">
+            <circle cx="14" cy="14" r="5.5" fill="#1a1830"/>
+            <circle cx="40" cy="14" r="5.5" fill="#1a1830"/>
+            <circle cx="14" cy="40" r="5.5" fill="#1a1830"/>
+            <circle cx="40" cy="40" r="5.5" fill="#1a1830"/></svg></div>
+          <div class="die-face f5"><svg viewBox="0 0 54 54" width="46" height="46">
+            <circle cx="14" cy="14" r="5.5" fill="#1a1830"/>
+            <circle cx="40" cy="14" r="5.5" fill="#1a1830"/>
+            <circle cx="27" cy="27" r="5.5" fill="#1a1830"/>
+            <circle cx="14" cy="40" r="5.5" fill="#1a1830"/>
+            <circle cx="40" cy="40" r="5.5" fill="#1a1830"/></svg></div>
+          <div class="die-face f6"><svg viewBox="0 0 54 54" width="46" height="46">
+            <circle cx="14" cy="14" r="5.5" fill="#1a1830"/>
+            <circle cx="40" cy="14" r="5.5" fill="#1a1830"/>
+            <circle cx="14" cy="27" r="5.5" fill="#1a1830"/>
+            <circle cx="40" cy="27" r="5.5" fill="#1a1830"/>
+            <circle cx="14" cy="40" r="5.5" fill="#1a1830"/>
+            <circle cx="40" cy="40" r="5.5" fill="#1a1830"/></svg></div>
+        </div>
+      </div>
       <div id="dice-label">Tap to Roll</div>
     </div>
     <div id="dpad" class="hidden">
@@ -214,6 +253,17 @@ const TOTAL = 10;
 const GW = 10, GH = 12;
 const FACES = ['⚀','⚁','⚂','⚃','⚄','⚅'];
 const WORDS = ['SHADOW','FLAME','STONE','BLADE','FROST','ABYSS','GHOST','EMBER','RUNE','VOID','IRON','CRYPT','SKULL','THORN','DUSK'];
+
+// cube rotation (rx, ry) that brings each face toward the viewer
+const LAND = {
+  1: {rx:-15, ry:20},   // front face (resting angle so die looks angled)
+  2: {rx:0,   ry:-90},  // right face
+  3: {rx:90,  ry:0},    // top face
+  4: {rx:-90, ry:0},    // bottom face
+  5: {rx:0,   ry:90},   // left face
+  6: {rx:0,   ry:180},  // back face
+};
+let dieLand = {rx:-15, ry:20}; // tracks current die orientation
 
 // ── SEEDED RNG ───────────────────────────────────────────────
 function mulberry32(seed) {
@@ -605,20 +655,39 @@ function buildPath(pos,dv,steps){
 function rollDie(){
   if (S.phase!=='roll'||S.locked) return;
   S.locked=true;
-  const btn=document.getElementById('dice-btn');
-  btn.classList.add('rolling');
-  let n=0;
-  const iv=setInterval(()=>{
-    btn.textContent=FACES[Math.floor(Math.random()*6)]; n++;
-    if (n>8){
-      clearInterval(iv);
-      const r=Math.floor(Math.random()*6)+1;
-      S.roll=r; S.ortho=(r%2===0); S.moves=r;
-      btn.textContent=FACES[r-1]; btn.classList.remove('rolling');
-      S.locked=false;
-      showChoosePhase();
-    }
-  },45);
+
+  const result = Math.floor(Math.random()*6)+1;
+  const {rx:landRx, ry:landRy} = LAND[result];
+  const cube = document.getElementById('die-cube');
+
+  // randomise how many full rotations to add (2–3 per axis, mixed direction)
+  const sx = (Math.random()>.5?1:-1)*(2+Math.floor(Math.random()*2))*360;
+  const sy = (Math.random()>.5?1:-1)*(2+Math.floor(Math.random()*2))*360;
+  const {rx:startRx, ry:startRy} = dieLand;
+  const endRx = landRx + sx;
+  const endRy = landRy + sy;
+
+  // arc apex: halfway through the spin + a lift
+  const arcRx = startRx + sx*0.45 + 40;
+  const arcRy = startRy + sy*0.45;
+
+  const anim = cube.animate([
+    { transform:`rotateX(${startRx}deg) rotateY(${startRy}deg) translateY(0px) scale(1)`,
+      easing:'cubic-bezier(0.4,0,0.2,1)' },
+    { transform:`rotateX(${arcRx}deg) rotateY(${arcRy}deg) translateY(-56px) scale(1.08)`,
+      offset:0.38, easing:'cubic-bezier(0.4,0,0.6,1)' },
+    { transform:`rotateX(${endRx}deg) rotateY(${endRy}deg) translateY(0px) scale(1)` },
+  ], { duration:720, fill:'forwards' });
+
+  anim.onfinish = () => {
+    anim.cancel();
+    // snap to clean canonical landing angle
+    cube.style.transform = `rotateX(${landRx}deg) rotateY(${landRy}deg) translateY(0px)`;
+    dieLand = {rx:landRx, ry:landRy};
+    S.roll=result; S.ortho=(result%2===0); S.moves=result;
+    S.locked=false;
+    showChoosePhase();
+  };
 }
 
 // ── DIRECTION ────────────────────────────────────────────────
@@ -856,7 +925,7 @@ function startGame(){
 }
 
 // ── INPUT ────────────────────────────────────────────────────
-document.getElementById('dice-btn').addEventListener('click',rollDie);
+document.getElementById('die-scene').addEventListener('click',rollDie);
 document.getElementById('my-dice').addEventListener('click',rollMystery);
 document.querySelectorAll('.db[data-d]').forEach(btn=>{
   btn.addEventListener('click',()=>{
