@@ -436,7 +436,9 @@ body{
           <div style="color:var(--dim);font-size:.72rem;margin-top:2px;">Move diagonally</div>
         </div>
       </div>
-      <div class="htp-tip">The die result is how many steps you take. You must use all of them.</div>
+      <div class="htp-tip">The die result is how many steps you take. You must use all of them — you cannot stop early.</div>
+      <div class="htp-tip" style="margin-top:4px;">If you hit a wall, choose a new direction and continue with your remaining steps. You cannot reverse direction (go back the way you came).</div>
+      <div class="htp-tip" style="margin-top:4px;">You also cannot start a turn in the same direction you ended the previous turn (no retracing your last path).</div>
     </div>
 
     <div class="htp-section">
@@ -615,6 +617,7 @@ let S={
   fi:0,hp:10,coins:0,deaths:0,
   pos:{x:1,y:1},grid:[],objs:{},hasKey:false,
   phase:'start',roll:0,ortho:true,moves:0,dir:null,locked:false,
+  prevDir:null,wallDir:null,  // for no-retrace rule
   sHP:10,sCoins:0,hpG:0,hpL:0,cG:0,cL:0,
   animPath:[],animIdx:0,animTimer:null,myCb:null,
 };
@@ -661,6 +664,7 @@ function loadFloor(fi){
   const fl=S.floors[fi];
   S.fi=fi;S.grid=fl.layout;S.hasKey=false;
   S.phase='roll';S.moves=0;S.dir=null;S.locked=false;
+  S.prevDir=null;S.wallDir=null;
   S.animPath=[];S.animIdx=0;clearTimeout(S.animTimer);
   for(let y=0;y<fl.layout.length;y++)
     for(let x=0;x<fl.layout[y].length;x++)
@@ -1058,12 +1062,17 @@ function showMovingPhase(){
   document.getElementById('dice-wrap').style.display='none';
 }
 function refreshDpad(){
+  const fdv=forbidDv();           // direction the player cannot choose
+  const anyOther=hasValidDir(fdv); // are there non-forbidden, non-blocked choices?
   document.querySelectorAll('.db[data-d]').forEach(btn=>{
     const d=btn.getAttribute('data-d'),diag=d.length===2;
     btn.classList.remove('dim','active');
     if(S.ortho&&diag||!S.ortho&&!diag){btn.classList.add('dim');return;}
     const dv=dvec(d);
-    if(blocked(S.pos.x+dv.x,S.pos.y+dv.y)) btn.classList.add('dim');
+    const isForbid=fdv&&dv.x===fdv.x&&dv.y===fdv.y;
+    // Only dim the forbidden direction if alternatives exist
+    if(isForbid&&anyOther){btn.classList.add('dim');return;}
+    if(blocked(S.pos.x+dv.x,S.pos.y+dv.y)){btn.classList.add('dim');return;}
     if(S.dir===d) btn.classList.add('active');
   });
 }
@@ -1077,20 +1086,31 @@ function dvec(d){
   return{n:{x:0,y:-1},s:{x:0,y:1},e:{x:1,y:0},w:{x:-1,y:0},
     ne:{x:1,y:-1},nw:{x:-1,y:-1},se:{x:1,y:1},sw:{x:-1,y:1}}[d];
 }
-function bounce(pos,dv){
-  const ox=dv.x,oy=dv.y;
-  let cands=ox===0||oy===0?(ox===0?[{x:1,y:0},{x:-1,y:0}]:[{x:0,y:-1},{x:0,y:1}]):[{x:ox,y:-oy},{x:-ox,y:oy}];
-  for(const c of cands) if(!blocked(pos.x+c.x,pos.y+c.y)) return c;
-  const rev={x:-ox,y:-oy};return!blocked(pos.x+rev.x,pos.y+rev.y)?rev:null;
-}
 function buildPath(pos,dv,steps){
-  const path=[];let p={...pos},d={...dv};
+  // Builds path in ONE direction, stops at the first wall.
+  // Wall redirect is interactive — player chooses new direction.
+  const path=[];let p={...pos};
   for(let i=0;i<steps;i++){
-    let np={x:p.x+d.x,y:p.y+d.y};
-    if(blocked(np.x,np.y)){const nd=bounce(p,d);if(!nd) break;d=nd;np={x:p.x+d.x,y:p.y+d.y};if(blocked(np.x,np.y)) break;}
-    p={...np};path.push({...p,dv:{...d}});
+    const np={x:p.x+dv.x,y:p.y+dv.y};
+    if(blocked(np.x,np.y)) break;
+    p={...np};path.push({...p,dv:{...dv}});
   }
   return path;
+}
+// Returns the forbidden direction vector (can't go back the way we came).
+function forbidDv(){
+  const src=S.wallDir||S.prevDir;
+  if(!src) return null;
+  const d=dvec(src);return{x:-d.x,y:-d.y};
+}
+// True if at least one non-forbidden, non-blocked direction exists of the right type.
+function hasValidDir(fdv){
+  const dirs=S.ortho?['n','s','e','w']:['ne','nw','se','sw'];
+  return dirs.some(d=>{
+    const dv=dvec(d);
+    if(fdv&&dv.x===fdv.x&&dv.y===fdv.y) return false;
+    return !blocked(S.pos.x+dv.x,S.pos.y+dv.y);
+  });
 }
 
 // ── DICE ──────────────────────────────────────────────────────
@@ -1126,16 +1146,35 @@ function rollDie(){
 function chooseDir(d){
   if(S.phase!=='choose'||S.locked) return;
   if(S.ortho===(d.length===2)) return;
-  S.dir=d;
-  S.animPath=buildPath(S.pos,dvec(d),S.moves);S.animIdx=0;
-  if(!S.animPath.length){setLog('Nowhere to move','bad');showRollPhase();return;}
+  const dv=dvec(d);
+  // Enforce no-retrace: can't reverse direction we just came from
+  const fdv=forbidDv();
+  if(fdv&&dv.x===fdv.x&&dv.y===fdv.y&&hasValidDir(fdv)) return;
+  S.dir=d;S.wallDir=null;
+  S.animPath=buildPath(S.pos,dv,S.moves);S.animIdx=0;
+  if(!S.animPath.length){
+    // Immediately against a wall in this direction
+    if(S.moves>0){S.wallDir=d;refreshDpad();return;}
+    setLog('Nowhere to move — re-rolling','bad');
+    setTimeout(showRollPhase,400);return;
+  }
   showMovingPhase();step();
 }
 
 // ── ANIMATION ─────────────────────────────────────────────────
 function step(){
   if(S.animIdx>=S.animPath.length){
-    S.moves=0;S.dir=null;render();setInfo('');
+    if(S.moves>0){
+      // Path ended but moves remain — we hit a wall, player must redirect
+      S.wallDir=S.dir;
+      S.phase='choose';
+      setInfo(`Wall! Choose new direction — <b>${S.moves}</b> left`);
+      refreshDpad();
+      document.getElementById('dpad').classList.remove('hidden');
+      render();return;
+    }
+    // All moves used
+    S.prevDir=S.dir;S.wallDir=null;S.dir=null;render();setInfo('');
     if(S.phase==='moving') showRollPhase();return;
   }
   const p=S.animPath[S.animIdx++];S.moves--;
@@ -1163,28 +1202,31 @@ function interact(k,obj){
         S.animTimer=setTimeout(step,200);});return;
     case 'e':
       S.hp-=obj.val;S.hpL+=obj.val;updateUI();
-      setLog(`Enemy hit you for ${obj.val} damage`,'bad');break;
-    case 'E':
-      clearTimeout(S.animTimer);
-      mystery('Mystery Enemy','Roll to reveal its strength!',v=>{
-        obj.val=v;S.hp-=v;S.hpL+=v;updateUI();
-        setLog(`Mystery enemy dealt ${v} damage`,'bad');
-        S.animTimer=setTimeout(step,200);});return;
+      setLog(`Enemy hit you for ${obj.val} damage`,'bad');
+      if(checkDeath()) return;
+      break;
+    case 'E':{
+      // Mystery enemy — same roll as movement (rule: no new roll for ? objects)
+      const v=S.roll;obj.val=v;
+      S.hp-=v;S.hpL+=v;updateUI();
+      setLog(`Mystery enemy revealed — dealt ${v} damage`,'bad');
+      if(checkDeath()) return;
+      break;}
     case 'h':
       S.hp=Math.min(25,S.hp+obj.val);S.hpG+=obj.val;updateUI();
       setLog(`Heart: +${obj.val} HP restored`,'good');break;
-    case 'H':
-      clearTimeout(S.animTimer);
-      mystery('Mystery Heart','Roll to see how much HP you restore!',v=>{
-        S.hp=Math.min(25,S.hp+v);S.hpG+=v;updateUI();
-        setLog(`Mystery heart: +${v} HP`,'good');
-        S.animTimer=setTimeout(step,200);});return;
-    case 'w':
+    case 'H':{
+      // Mystery heart — same roll as movement
+      const v=S.roll;
+      S.hp=Math.min(25,S.hp+v);S.hpG+=v;updateUI();
+      setLog(`Mystery heart revealed — +${v} HP`,'good');break;}
+    case 'w':{
+      // Web — lose coins equal to this turn's roll, movement stops
       clearTimeout(S.animTimer);S.animPath=[];
-      mystery('Spiderweb Trap','Caught! Roll to lose that many coins.',v=>{
-        const lost=Math.min(v,S.coins);S.coins-=lost;S.cL+=lost;updateUI();
-        setLog(`Caught in web — lost ${lost} coins`,'bad');
-        S.moves=0;setTimeout(()=>{setInfo('');showRollPhase();},400);});return;
+      const lost=Math.min(S.roll,S.coins);S.coins-=lost;S.cL+=lost;updateUI();
+      setLog(`Caught in web — lost ${lost} coins (rolled ${S.roll})`,'bad');
+      S.moves=0;S.prevDir=S.dir;S.wallDir=null;
+      setTimeout(()=>{setInfo('');showRollPhase();},500);return;}
     case 'k':
       S.hasKey=true;setLog('Key collected — locked door unlocked','gold');break;
     case 'T':{
@@ -1203,6 +1245,27 @@ function interact(k,obj){
       }
       obj.used=false;break;}
   }
+}
+
+// ── DEATH ─────────────────────────────────────────────────────
+function checkDeath(){
+  if(S.hp>0) return false;
+  // Dead: lose all coins, advance to next floor at 10 HP
+  S.deaths++;
+  clearTimeout(S.animTimer);S.animPath=[];S.moves=0;
+  S.prevDir=null;S.wallDir=null;
+  setLog('You died! Advancing to next floor…','bad');
+  updateUI();
+  if(S.fi>=TOTAL-1){
+    // Died on last floor — go straight to score
+    setTimeout(showScore,1400);
+  } else {
+    setTimeout(()=>{
+      S.hp=10;S.coins=0;updateUI();
+      loadFloor(S.fi+1);
+    },1400);
+  }
+  return true;
 }
 
 // ── MYSTERY ───────────────────────────────────────────────────
@@ -1247,7 +1310,7 @@ function offerStairs(){
     <div class="ov-row"><span class="ov-label">+ Collected</span><span class="pos">+${S.cG}</span></div>
     <div class="ov-row"><span class="ov-label">− Lost</span><span class="neg">−${S.cL}</span></div>
     <div class="ov-row"><span class="ov-label">Ending ¢</span><span class="pos">${endCoins}</span></div>
-    ${died?'<div style="color:#ff7070;font-size:.77rem;text-align:center;margin-top:9px;letter-spacing:.3px;">☠ You died — next floor: 10 HP, 0¢</div>':''}
+    ${died?'<div style="color:#ff7070;font-size:.77rem;text-align:center;margin-top:9px;letter-spacing:.3px;">☠ You arrived here after death — 10 HP, 0¢</div>':''}
     ${isLast
       ?'<button class="ov-btn" onclick="showScore()">See Final Score</button>'
       :`<button class="ov-btn" onclick="descend()">Descend to Floor ${S.floors[S.fi].num+1}</button>
@@ -1257,7 +1320,7 @@ function offerStairs(){
 }
 function descend(){
   document.getElementById('floor-overlay').classList.add('hidden');
-  if(S.hp<=0){S.deaths++;S.hp=10;S.coins=0;}else S.coins=Math.max(0,S.coins);
+  S.coins=Math.max(0,S.coins);
   updateUI();loadFloor(S.fi+1);
 }
 function stayOnFloor(){
