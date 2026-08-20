@@ -1108,13 +1108,17 @@ function rollDie(){
     {transform:`rotateX(${sRx}deg) rotateY(${sRy}deg) translateY(0px) scale(1)`,easing:'cubic-bezier(.4,0,.2,1)'},
     {transform:`rotateX(${sRx+sx*.45+40}deg) rotateY(${sRy+sy*.45}deg) translateY(-56px) scale(1.08)`,offset:.38,easing:'cubic-bezier(.4,0,.6,1)'},
     {transform:`rotateX(${endRx}deg) rotateY(${endRy}deg) translateY(0px) scale(1)`},
-  ],{duration:720,fill:'forwards'});
+  ],{duration:800,fill:'forwards'});
   anim.onfinish=()=>{
     anim.cancel();
     cube.style.transform=`rotateX(${landRx}deg) rotateY(${landRy}deg) translateY(0px)`;
     dieLand={rx:landRx,ry:landRy};
-    S.roll=result;S.ortho=result%2===0;S.moves=result;S.locked=false;
-    showChoosePhase();
+    S.roll=result;S.ortho=result%2===0;S.moves=result;
+    // Hold the result visible for 700ms before enabling direction input
+    setTimeout(()=>{
+      S.locked=false;
+      showChoosePhase();
+    },700);
   };
 }
 
